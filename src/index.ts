@@ -1,5 +1,10 @@
 import express, { Request, Response } from "express";
-import { CLERK_WEBHOOK_SECRET_KEY, MONGO_URI, NODE_ENV, PORT } from "./utils/envConfig.js";
+import {
+  CLERK_WEBHOOK_SECRET_KEY,
+  MONGO_URI,
+  NODE_ENV,
+  PORT,
+} from "./utils/envConfig.js";
 import morgan from "morgan";
 import cors from "cors";
 import helmet from "helmet";
@@ -10,12 +15,17 @@ import bodyParser from "body-parser";
 import { Webhook } from "svix";
 import User from "./models/user.js";
 import connectDb from "./helpers/connectDb.js";
-import { scrapeDocs } from "./utils/scrape.js";
+import Chat from "./models/chats.js";
+import Message from "./models/message.js";
 
-const ollama = new Ollama({ host: "http://ollama.ayushdixit.site" });
+const ollama = new Ollama({ host: process.env.OLLAMA_HOST });
 
 // Allowed origins for CORS
-const allowedOrigins = ["http://localhost:3000", "http://localhost:3001", "http://192.168.1.2:3000"];
+const allowedOrigins = [
+  "http://localhost:3000",
+  "http://localhost:3001",
+  "http://192.168.1.2:3000",
+];
 
 // Initialize Express app
 const app = express();
@@ -56,118 +66,19 @@ app.get("/", (_, res) => {
   res.send("Server is running!");
 });
 
-// app.post("/chat", async (req: Request, res: Response): Promise<void> => {
-//   const { prompt } = req.body;
-
-//   if (!prompt) {
-//     res.status(400).json({ error: "Prompt is required" });
-//     return;
-//   }
-
-//   try {
-//    // Set response headers for streaming
-//     res.setHeader("Content-Type", "text/plain");
-//     res.setHeader("Transfer-Encoding", "chunked");
-
-//     const stream = await ollama.chat({
-//       model: "llama3:8b",
-//       messages: [{ role: "user", content: prompt }],
-//       stream: true, // Enable streaming
-//     });
-
-//     for await (const chunk of stream) {
-//       console.log(chunk.message, "message");
-
-//       res.write(chunk.message.content); // Send each chunk to client
-//       res.flush(); // 🛠 Ensure data is sent immediately
-//     }
-
-//     res.end(); // End response when streaming is complete
-
-//   } catch (error: unknown) {
-//     console.error("Error streaming response from Ollama:", error);
-//     res.status(500).json({ error: "Failed to stream response from Ollama" });
-//   }
-// });
-
-
-// app.post("/chat", async (req: Request, res: Response): Promise<void> => {
-//   const { prompt } = req.body;
-
-//   if (!prompt) {
-//     res.status(400).json({ error: "Prompt is required" });
-//     return;
-//   }
-
-//   try {
-//     const response = await scrapeDocs(prompt);
-
-//     let stream;
-
-//     console.log(response?.content.slice(0,200))
-
-//     if (response?.title && response?.content) {
-//        stream = await ollama.chat({
-//         model: "mistral",
-//         messages: [
-//           {
-//             role: "system",
-//             content: `Your task is to help the user by using the information from the following document from scraped docs. This document contains useful details that should be used to answer the user's question.
-
-//               When responding:
-//               1. Focus only on the relevant parts of the document.
-//               2. Summarize information in a clear and simple way.
-//               3. If the document does not have an answer, say so politely.
-//               4. Provide code examples when needed to make the response easier to understand.
-
-//               Here is the document with title and content:
-//               \n\n${response.title}: ${response.content.slice(0,200)}`,
-//           },
-//           { role: "user", content: prompt },
-//         ],
-//         stream: true,
-//       });
-//     } else {
-//        stream = await ollama.chat({
-//         model: "mistral",
-//         messages: [{ role: "user", content: prompt }],
-//         stream: true,
-//       });
-
-//     }
-
-
-//     res.setHeader("Content-Type", "text/plain");
-//     res.setHeader("Transfer-Encoding", "chunked");
-
-//     for await (const chunk of stream) {
-//       console.log(chunk.message.content, "message");
-//       res.write(chunk.message.content);
-//       res.flush(); // Ensure immediate transmission
-//     }
-
-//     res.end();
-//   } catch (error: unknown) {
-//     console.error("Error streaming response from Ollama:", error);
-//     res.status(500).json({ error: "Failed to generate response" });
-//   }
-// });
-
-
 app.post("/chat", async (req: Request, res: Response): Promise<void> => {
-  const { prompt } = req.body;
+  const { prompt, clerkUserId } = req.body;
 
   if (!prompt) {
     res.status(400).json({ error: "Prompt is required" });
     return;
   }
-
   try {
     let stream;
-    let isUrl = true
+    let isUrl = true;
     if (!prompt || !/^https:\/\/.+/.test(prompt)) {
       console.error("Invalid prompt:", prompt);
-      isUrl = false
+      isUrl = false;
     }
 
     if (isUrl) {
@@ -175,7 +86,7 @@ app.post("/chat", async (req: Request, res: Response): Promise<void> => {
         {
           role: "system",
           content: `Your task is to help the user by scraping data from this url: ${prompt} , and using the information from this scraped data. This scraped data contains useful details that should be used to answer the user's question.
-            
+
             When responding:
             1. Focus only on the relevant parts of the data.
             2. Summarize information in a clear and simple way.
@@ -184,9 +95,9 @@ app.post("/chat", async (req: Request, res: Response): Promise<void> => {
             `,
         },
         { role: "user", content: prompt },
-      ]
+      ];
 
-      console.log(messages, "messages")
+      console.log(messages, "messages");
 
       stream = await ollama.chat({
         model: "mistral",
@@ -199,9 +110,8 @@ app.post("/chat", async (req: Request, res: Response): Promise<void> => {
         messages: [{ role: "user", content: prompt }],
         stream: true,
       });
-
     }
-
+    let string = "";
 
     res.setHeader("Content-Type", "text/plain");
     res.setHeader("Transfer-Encoding", "chunked");
@@ -209,13 +119,52 @@ app.post("/chat", async (req: Request, res: Response): Promise<void> => {
     for await (const chunk of stream) {
       console.log(chunk.message.content, "message");
       res.write(chunk.message.content);
-      res.flush(); // Ensure immediate transmission
+      string += chunk.message.content;
+      res.flush();
     }
 
     res.end();
+    console.log("final", string);
+
+    const user = await User.findOne({ clerkUserId }).select("_id")
+    let chat = await Chat.findOne()
+
+    const userMessage = new Message({
+      role: "user",
+      content: prompt,
+    })
+
+    const systemMessage = new Message({
+      role: "assistant",
+      content: string,
+    })
+
+    await Promise.all([userMessage.save(), systemMessage.save()])
+
+    if (!chat) {
+      chat = new Chat({
+        title: prompt,
+        messages: [userMessage._id, systemMessage._id],
+        userId: user?._id
+      })
+    } else {
+      chat.messages.push(...[userMessage._id, systemMessage._id]);
+    }
+
+    await chat.save()
+
+    userMessage.chatId = chat._id
+    systemMessage.chatId = chat._id
+    await Promise.all([userMessage.save(), systemMessage.save()])
+
   } catch (error: unknown) {
-    console.error("Error streaming response from Ollama:", error);
-    res.status(500).json({ error: "Failed to generate response" });
+    if ((error as Error).name === "AbortError") {
+      console.log("Ollama request aborted.");
+      res.end();
+    } else {
+      console.error("Error streaming response from Ollama:", error);
+      res.status(500).json({ error: "Failed to generate response" });
+    }
   }
 });
 
@@ -253,7 +202,9 @@ const processWebhook = async (req: Request, res: Response): Promise<any> => {
 
   if (!svix_id || !svix_timestamp || !svix_signature) {
     console.error("❌ Missing Svix Headers");
-    return res.status(400).json({ success: false, message: "Missing required headers" });
+    return res
+      .status(400)
+      .json({ success: false, message: "Missing required headers" });
   }
 
   const payloadString = req.body.toString();
@@ -268,7 +219,9 @@ const processWebhook = async (req: Request, res: Response): Promise<any> => {
 
     if (!evt) {
       console.error("❌ Invalid event");
-      return res.status(400).json({ success: false, message: "Invalid event data" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid event data" });
     }
 
     switch (evt?.type) {
@@ -287,11 +240,17 @@ const processWebhook = async (req: Request, res: Response): Promise<any> => {
         break;
     }
 
-    return res.status(200).json({ success: true, message: "Webhook processed" });
-
+    return res
+      .status(200)
+      .json({ success: true, message: "Webhook processed" });
   } catch (err) {
     console.error("❌ Webhook verification failed:", err);
-    return res.status(500).json({ success: false, message: "Server error during webhook processing" });
+    return res
+      .status(500)
+      .json({
+        success: false,
+        message: "Server error during webhook processing",
+      });
   }
 };
 
@@ -305,8 +264,7 @@ app.use((_, res) => {
 // Error Handling Middleware
 app.use(errorMiddleware);
 
-
-connectDb(MONGO_URI)
+connectDb(MONGO_URI);
 
 // Start server
 app.listen(PORT, () => {
