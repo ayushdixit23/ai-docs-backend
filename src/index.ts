@@ -10,15 +10,11 @@ import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
 import { errorMiddleware } from "./middlewares/errors/errorMiddleware.js";
-import { Ollama } from "ollama";
 import bodyParser from "body-parser";
 import { Webhook } from "svix";
 import User from "./models/user.js";
 import connectDb from "./helpers/connectDb.js";
-import Chat from "./models/chats.js";
-import Message from "./models/message.js";
-
-const ollama = new Ollama({ host: process.env.OLLAMA_HOST });
+import chatRouter from "./routes/chats.js"
 
 // Allowed origins for CORS
 const allowedOrigins = [
@@ -66,107 +62,7 @@ app.get("/", (_, res) => {
   res.send("Server is running!");
 });
 
-app.post("/chat", async (req: Request, res: Response): Promise<void> => {
-  const { prompt, clerkUserId } = req.body;
-
-  if (!prompt) {
-    res.status(400).json({ error: "Prompt is required" });
-    return;
-  }
-  try {
-    let stream;
-    let isUrl = true;
-    if (!prompt || !/^https:\/\/.+/.test(prompt)) {
-      console.error("Invalid prompt:", prompt);
-      isUrl = false;
-    }
-
-    if (isUrl) {
-      const messages = [
-        {
-          role: "system",
-          content: `Your task is to help the user by scraping data from this url: ${prompt} , and using the information from this scraped data. This scraped data contains useful details that should be used to answer the user's question.
-
-            When responding:
-            1. Focus only on the relevant parts of the data.
-            2. Summarize information in a clear and simple way.
-            3. If the data does not have an answer, say so politely.
-            4. Provide code examples when needed to make the response easier to understand.
-            `,
-        },
-        { role: "user", content: prompt },
-      ];
-
-      console.log(messages, "messages");
-
-      stream = await ollama.chat({
-        model: "mistral",
-        messages: messages,
-        stream: true,
-      });
-    } else {
-      stream = await ollama.chat({
-        model: "mistral",
-        messages: [{ role: "user", content: prompt }],
-        stream: true,
-      });
-    }
-    let string = "";
-
-    res.setHeader("Content-Type", "text/plain");
-    res.setHeader("Transfer-Encoding", "chunked");
-
-    for await (const chunk of stream) {
-      console.log(chunk.message.content, "message");
-      res.write(chunk.message.content);
-      string += chunk.message.content;
-      res.flush();
-    }
-
-    res.end();
-    console.log("final", string);
-
-    const user = await User.findOne({ clerkUserId }).select("_id")
-    let chat = await Chat.findOne()
-
-    const userMessage = new Message({
-      role: "user",
-      content: prompt,
-    })
-
-    const systemMessage = new Message({
-      role: "assistant",
-      content: string,
-    })
-
-    await Promise.all([userMessage.save(), systemMessage.save()])
-
-    if (!chat) {
-      chat = new Chat({
-        title: prompt,
-        messages: [userMessage._id, systemMessage._id],
-        userId: user?._id
-      })
-    } else {
-      chat.messages.push(...[userMessage._id, systemMessage._id]);
-    }
-
-    await chat.save()
-
-    userMessage.chatId = chat._id
-    systemMessage.chatId = chat._id
-    await Promise.all([userMessage.save(), systemMessage.save()])
-
-  } catch (error: unknown) {
-    if ((error as Error).name === "AbortError") {
-      console.log("Ollama request aborted.");
-      res.end();
-    } else {
-      console.error("Error streaming response from Ollama:", error);
-      res.status(500).json({ error: "Failed to generate response" });
-    }
-  }
-});
+app.use("/api",chatRouter)
 
 const handleUserData = async (event: any) => {
   const { id, image_url, last_name, first_name, email_addresses } = event.data;
@@ -224,6 +120,7 @@ const processWebhook = async (req: Request, res: Response): Promise<any> => {
         .json({ success: false, message: "Invalid event data" });
     }
 
+    // @ts-ignore
     switch (evt?.type) {
       case "user.created":
       case "user.updated":
@@ -231,11 +128,13 @@ const processWebhook = async (req: Request, res: Response): Promise<any> => {
         break;
 
       case "user.deleted":
+         // @ts-ignore
         const { id } = evt?.data;
         await User.findOneAndDelete({ clerkUserId: id });
         break;
 
       default:
+         // @ts-ignore
         console.warn(`⚠️ Unhandled event type: ${evt?.type}`);
         break;
     }
