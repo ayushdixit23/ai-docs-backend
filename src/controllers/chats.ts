@@ -79,7 +79,8 @@ export const generateAnswer = asyncHandler(async (req: Request, res: Response) =
             content: string,
         })
 
-        await Promise.all([userMessage.save(), systemMessage.save()])
+        await userMessage.save()
+        await systemMessage.save()
 
         if (!chat) {
             chat = new Chat({
