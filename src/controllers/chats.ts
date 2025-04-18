@@ -5,6 +5,7 @@ import Chat from "../models/chats.js";
 import Message from "../models/message.js";
 import asyncHandler from "../middlewares/tryCatch.js";
 import { CustomError } from "../middlewares/errors/CustomError.js";
+import mongoose from "mongoose";
 
 // export const generateAnswer = asyncHandler(async (req: Request, res: Response) => {
 //     const { prompt, clerkUserId } = req.body;
@@ -242,8 +243,17 @@ export const getChats = asyncHandler(async (req: Request, res: Response) => {
 
 export const getMessages = asyncHandler(async (req: Request, res: Response) => {
     const { chatId } = req.params
+
+    if (!chatId) {
+        throw new CustomError("Chat ID is required!", 400)
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(chatId)) {
+        throw new CustomError("Invalid chat ID!", 400)
+    }
+
     const messages = await Message.find({ chatId })
-    return res.status(200).json({ success: true, messages: messages || [] })
+    return res.status(200).json({ success: true, messages: messages || [], isValid: true })
 })
 
 export const updateChat = asyncHandler(async (req: Request, res: Response) => {
