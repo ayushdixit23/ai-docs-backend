@@ -246,14 +246,59 @@ export const getMessages = asyncHandler(async (req: Request, res: Response) => {
     return res.status(200).json({ success: true, messages: messages || [] })
 })
 
-// const cleanUp = async () => {
-//     console.log("Cleaning up...");
-//     await Chat.deleteMany()
-//     await Message.deleteMany()
+export const updateChat = asyncHandler(async (req: Request, res: Response) => {
+    const { chatId, clerkUserId } = req.params
+    const { title } = req.body
 
-//     await User.findOneAndUpdate({}, { chats: [] })
+    const user = await User.findOne({ clerkUserId }).select("_id")
 
-//     console.log("Cleanup complete.");
-// }
+    if (!user) {
+        throw new CustomError("No user found!", 400)
+    }
 
-// // cleanUp()
+    const chat = await Chat.findOne({ _id: chatId, userId: user._id })
+
+    if (!chat) {
+        throw new CustomError("Chat not found!", 400)
+    }
+
+    chat.title = title
+
+    await chat.save()
+    return res.status(200).json({ success: true, message: "Chat updated successfully" })
+})
+
+export const deleteChat = asyncHandler(async (req: Request, res: Response) => {
+    const { chatId, clerkUserId } = req.params
+
+    const user = await User.findOne({ clerkUserId }).select("_id")
+
+    if (!user) {
+        throw new CustomError("No user found!", 400)
+    }
+
+    const chat = await Chat.findOne({ _id: chatId, userId: user._id })
+
+    if (!chat) {
+        throw new CustomError("Chat not found!", 400)
+    }
+
+    await Promise.all([
+        Chat.findByIdAndDelete(chatId),
+        Message.deleteMany({ chatId }),
+        User.updateOne({ clerkUserId }, { $pull: { chats: chatId } })
+    ])
+    return res.status(200).json({ success: true, message: "Chat deleted successfully" })
+})
+
+const cleanUp = async () => {
+    console.log("Cleaning up...");
+    await Chat.deleteMany()
+    await Message.deleteMany()
+
+    await User.findOneAndUpdate({}, { chats: [] })
+
+    console.log("Cleanup complete.");
+}
+
+// cleanUp()
