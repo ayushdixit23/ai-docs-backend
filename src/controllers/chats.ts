@@ -250,6 +250,18 @@ export const updateChat = asyncHandler(async (req: Request, res: Response) => {
     const { chatId, clerkUserId } = req.params
     const { title } = req.body
 
+    if (!chatId) {
+        throw new CustomError("Chat ID is required!", 400)
+    }
+
+    if (!clerkUserId) {
+        throw new CustomError("Clerk User ID is required!", 400)
+    }
+
+    if (!title) {
+        throw new CustomError("Title is required!", 400)
+    }
+
     const user = await User.findOne({ clerkUserId }).select("_id")
 
     if (!user) {
@@ -270,6 +282,14 @@ export const updateChat = asyncHandler(async (req: Request, res: Response) => {
 
 export const deleteChat = asyncHandler(async (req: Request, res: Response) => {
     const { chatId, clerkUserId } = req.params
+
+    if (!chatId) {
+        throw new CustomError("Chat ID is required!", 400)
+    }
+
+    if (!clerkUserId) {
+        throw new CustomError("Clerk User ID is required!", 400)
+    }
 
     const user = await User.findOne({ clerkUserId }).select("_id")
 
