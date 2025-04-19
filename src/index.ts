@@ -20,7 +20,11 @@ import chatRouter from "./routes/chats.js"
 const allowedOrigins = [
   "http://localhost:3000",
   "http://localhost:3001",
+  "http://192.168.1.2:3000",
   "http://192.168.1.3:3000",
+  "http://192.168.1.4:3000",
+  "http://192.168.1.5:3000",
+  "http://192.168.1.6:3000",
 ];
 
 // Initialize Express app
@@ -62,7 +66,7 @@ app.get("/", (_, res) => {
   res.send("Server is running!");
 });
 
-app.use("/api",chatRouter)
+app.use("/api", chatRouter)
 
 const handleUserData = async (event: any) => {
   const { id, image_url, last_name, first_name, email_addresses } = event.data;
@@ -128,13 +132,13 @@ const processWebhook = async (req: Request, res: Response): Promise<any> => {
         break;
 
       case "user.deleted":
-         // @ts-ignore
+        // @ts-ignore
         const { id } = evt?.data;
         await User.findOneAndDelete({ clerkUserId: id });
         break;
 
       default:
-         // @ts-ignore
+        // @ts-ignore
         console.warn(`⚠️ Unhandled event type: ${evt?.type}`);
         break;
     }
