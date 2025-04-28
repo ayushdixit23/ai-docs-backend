@@ -6,6 +6,7 @@ import Message from "../models/message.js";
 import asyncHandler from "../middlewares/tryCatch.js";
 import { CustomError } from "../middlewares/errors/CustomError.js";
 import mongoose from "mongoose";
+import { scrapeDocs } from "../utils/scrape.js";
 
 // export const generateAnswer = asyncHandler(async (req: Request, res: Response) => {
 //     const { prompt, clerkUserId } = req.body;
@@ -150,20 +151,32 @@ export const generateAnswerForExistingChat = asyncHandler(async (req: Request, r
         }
 
         if (isUrl) {
+            const scrapedData = await scrapeDocs(prompt)
+            console.log(scrapedData, "scrapedData")
             const messages = [
                 {
-                    role: "system",
-                    content: `Your task is to help the user by scraping data from this url: ${prompt} , and using the information from this scraped data. This scraped data contains useful details that should be used to answer the user's question.
-  
-              When responding:
-              1. Focus only on the relevant parts of the data.
-              2. Summarize information in a clear and simple way.
-              3. If the data does not have an answer, say so politely.
-              4. Provide code examples when needed to make the response easier to understand.
-              `,
+                    role: "system" as const,
+                    content: `
+                    You are a technical assistant specialized in simplifying technical documentation.
+                    
+                    You have been provided with scraped content from the following URL: ${String(prompt)}
+                    
+                    Your task:
+                    - Read and understand the scraped content carefully.
+                    - Summarize the important and relevant parts in **clear, beginner-friendly language**.
+                    - Where applicable, provide **simple JavaScript code examples** to illustrate the concepts.
+                    - If the scraped content does not contain enough information to answer, politely mention it.
+              
+                    Guidelines:
+                    - Avoid copying large portions of text directly.
+                    - Focus on **clarity**, **simplicity**, and **teaching the concept effectively**.
+                    - Only use the provided scraped data for your answers.
+                  `,
                 },
-
-                { role: "user", content: prompt },
+                {
+                    role: "user" as const,
+                    content: String(scrapedData),
+                },
             ];
 
             stream = await ollama.chat({
