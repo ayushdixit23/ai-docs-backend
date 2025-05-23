@@ -15,7 +15,6 @@ import { Webhook } from "svix";
 import User from "./models/user.js";
 import connectDb from "./helpers/connectDb.js";
 import chatRouter from "./routes/chats.js"
-import client from "./helpers/chroma.js";
 
 // Allowed origins for CORS
 const allowedOrigins = [
@@ -30,8 +29,6 @@ const allowedOrigins = [
 
 // Initialize Express app
 const app = express();
-
-console.log(client)
 
 // Middlewares
 app.use(helmet()); // Security headers

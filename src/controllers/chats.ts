@@ -180,27 +180,30 @@ export const generateAnswerForExistingChat = asyncHandler(async (req: Request, r
             ];
 
             stream = await ollama.chat({
-                model: "mistral",
+                model: "llama3.1:8b",
                 messages: messages,
                 stream: true,
             });
         } else {
             stream = await ollama.chat({
-                model: "mistral",
+                model: "llama3.1:8b",
                 messages: [{ role: "user", content: prompt }],
                 stream: true,
             });
         }
+
+        console.log(stream, "stream")
         let string = "";
 
         res.setHeader("Content-Type", "text/plain");
         res.setHeader("Transfer-Encoding", "chunked");
+        res.flushHeaders()
 
         for await (const chunk of stream) {
             console.log(chunk.message.content, "message");
             res.write(chunk.message.content);
             string += chunk.message.content;
-            res.flush();
+            if (res.flush) res.flush();
         }
 
         res.end();
