@@ -8,6 +8,10 @@ import mongoose from "mongoose";
 import { scrapeDocs } from "../utils/scrape.js";
 import googleAiClient from "../helpers/gemini.js";
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
+import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
+import qdrantClient from "../helpers/qdrantClient.js";
+import { QdrantVectorStore } from "@langchain/qdrant";
+import embeddings from "../helpers/embeddings.js";
 
 export const createChat = asyncHandler(async (req: Request, res: Response) => {
   const { clerkUserId } = req.params;
@@ -31,126 +35,117 @@ export const createChat = asyncHandler(async (req: Request, res: Response) => {
   res.status(201).json({ success: true, chatId: chat._id });
 });
 
-// export const generateAnswerForExistingChat = asyncHandler(
-//     async (req: Request, res: Response) => {
-//         const { chatId } = req.params;
-//         const { prompt } = req.body;
+export const getDocsSimplified = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { chatId } = req.params;
+    const { prompt } = req.body;
 
-//         if (!prompt) {
-//             res.status(400).json({ error: "Prompt is required" });
-//             return;
-//         }
+    if (!prompt) {
+      res.status(400).json({ error: "Prompt is required", success: false });
+      return;
+    }
 
-//         let stream:
-//             | (AsyncIterable<{ message: { content: string } }> & {
-//                 abort: () => void;
-//             })
-//             | undefined;
+    const httpsUrlRegex = /^https:\/\/[^\s/$.?#].[^\s]*$/i;
 
-//         try {
-//             let isUrl = false;
-//             if (/^https:\/\/.+/.test(prompt)) {
-//                 console.error("Invalid prompt:", prompt);
-//                 isUrl = true;
-//             }
+    if (!httpsUrlRegex.test(prompt)) {
+      res
+        .status(400)
+        .json({ error: "Prompt must be a valid HTTPS URL", success: false });
+      return;
+    }
 
-//             if (isUrl) {
-//                 const scrapedData = await scrapeDocs(prompt);
+    try {
+      const scrapedData = await scrapeDocs(prompt);
+      const maxInputLength = 16000;
 
-//                 const messages = [
-//                     {
-//                         role: "system" as const,
-//                         content: `
-//                     You are a technical assistant specialized in simplifying technical documentation.
+      const trimmedInput =
+        scrapedData.length > maxInputLength
+          ? scrapedData.slice(0, maxInputLength)
+          : scrapedData;
 
-//                     You have been provided with scraped content from the following URL: ${String(
-//                             prompt
-//                         )}
+      const stream = await googleAiClient.models.generateContentStream({
+        model: "gemini-2.0-flash",
+        contents: trimmedInput ? trimmedInput : prompt,
+        config: {
+          temperature: 0.2,
+          systemInstruction: `You are a technical assistant specializing in simplifying technical documentation for beginners.
 
-//                     Your task:
-//                     - Read and understand the scraped content carefully.
-//                     - Summarize the important and relevant parts in **clear, beginner-friendly language**.
-//                     - Where applicable, provide **simple JavaScript code examples** to illustrate the concepts.
-//                     - If the scraped content does not contain enough information to answer, politely mention it.
+Your task:
+- Carefully read and understand the scraped content provided.
+- Summarize only the important and relevant parts in clear, beginner-friendly language.
+- Use simple, real-world analogies where helpful.
+- Provide simple code examples in relevant programming languages to illustrate concepts.
+- Format your response using bullet points and code blocks when appropriate.
+- Avoid technical jargon and overly complex explanations.
+- If the scraped content does not contain enough information, answer based on your own knowledge, but state when you are doing so.
+- Do not provide unrelated information or speculation.
+- Keep the response concise and focused on teaching.
 
-//                     Guidelines:
-//                     - Avoid copying large portions of text directly.
-//                     - Focus on **clarity**, **simplicity**, and **teaching the concept effectively**.
-//                     - Only use the provided scraped data for your answers.
-//                   `,
-//                     },
-//                     {
-//                         role: "user" as const,
-//                         content: String(scrapedData),
-//                     },
-//                 ];
+Respond clearly and helpfully.`,
+        },
+      });
 
-//                 stream = await ollama.chat({
-//                     model: "mistral:latest",
-//                     // model: "llama3.1:8b",
-//                     messages: messages,
-//                     stream: true,
-//                 });
-//             } else {
-//                 stream = await ollama.chat({
-//                     model: "mistral:latest",
-//                     // model: "llama3.1:8b",
-//                     messages: [{ role: "user", content: prompt }],
-//                     stream: true,
-//                 });
-//             }
+      let string = "";
 
-//             let string = "";
+      res.setHeader("Content-Type", "text/plain");
+      res.setHeader("Transfer-Encoding", "chunked");
+      res.flushHeaders();
 
-//             res.setHeader("Content-Type", "text/plain");
-//             res.setHeader("Transfer-Encoding", "chunked");
-//             res.flushHeaders();
+      for await (const chunk of stream) {
+        if (chunk.text) {
+          res.write(chunk.text);
+          string += chunk.text;
+        }
+        if (res.flush) res.flush();
+      }
 
-//             for await (const chunk of stream) {
-//                 if (chunk.message?.content) {
-//                     res.write(chunk.message.content);
-//                     string += chunk.message.content;
-//                 }
-//                 if (res.flush) res.flush();
-//             }
+      const chat = await Chat.findById(chatId);
 
-//             res.end();
+      if (!chat) {
+        return new CustomError("Chat not found!", 400);
+      }
 
-//             const chat = await Chat.findById(chatId);
+      const userMessage = new Message({
+        role: "user",
+        content: prompt,
+      });
 
-//             if (!chat) {
-//                 return new CustomError("Chat not found!", 400);
-//             }
+      const systemMessage = new Message({
+        role: "assistant",
+        content: string,
+      });
+      await userMessage.save();
+      await systemMessage.save();
 
-//             const userMessage = new Message({
-//                 role: "user",
-//                 content: prompt,
-//             });
+      chat.messages.push(...[userMessage._id, systemMessage._id]);
 
-//             const systemMessage = new Message({
-//                 role: "assistant",
-//                 content: string,
-//             });
-//             await userMessage.save();
-//             await systemMessage.save();
+      await chat.save();
+      userMessage.chatId = chat._id;
+      systemMessage.chatId = chat._id;
+      await Promise.all([userMessage.save(), systemMessage.save()]);
 
-//             chat.messages.push(...[userMessage._id, systemMessage._id]);
+      const textSplitter = new RecursiveCharacterTextSplitter({
+        chunkSize: 500,
+        chunkOverlap: 50,
+      });
+      const texts = await textSplitter.splitText(scrapedData);
 
-//             await chat.save();
-//             userMessage.chatId = chat._id;
-//             systemMessage.chatId = chat._id;
-//             await Promise.all([userMessage.save(), systemMessage.save()]);
-//         } catch (error: unknown) {
-//             if ((error as Error).name === "AbortError") {
-//                 console.log("Ollama request aborted.");
-//                 res.end();
-//             } else {
-//                 console.error("Error streaming response from Ollama:", error);
-//                 res.status(500).json({ error: "Failed to generate response" });
-//             }
-//         }
-//     }
-// );
+      await QdrantVectorStore.fromTexts(texts, [], embeddings, {
+        client: qdrantClient,
+        collectionName: "chats_docs_chunks",
+      });
+    } catch (error: unknown) {
+      if ((error as Error).name === "AbortError") {
+        res.end();
+      } else {
+        console.error("Error streaming response from Google Gemini:", error);
+        res
+          .status(500)
+          .json({ error: "Failed to generate response", success: false });
+      }
+    }
+  }
+);
 
 export const getChats = asyncHandler(async (req: Request, res: Response) => {
   const { clerkUserId } = req.params;
@@ -268,20 +263,21 @@ export const generateAnswerForExistingChat = asyncHandler(
       if (!scrapedData) {
         return res.status(400).json({ error: "No meaningful content found." });
       }
-
       const textSplitter = new RecursiveCharacterTextSplitter({
         chunkSize: 500,
         chunkOverlap: 50,
       });
       const texts = await textSplitter.splitText(scrapedData);
 
-      res
-        .status(200)
-        .json({
-          success: true,
-          message: "Scraped data processed successfully",
-          data: scrapedData,
-        });
+      await QdrantVectorStore.fromTexts(texts, [], embeddings, {
+        client: qdrantClient,
+        collectionName: "chats_docs_chunks",
+      });
+      res.status(200).json({
+        success: true,
+        message: "Scraped data processed successfully",
+        data: scrapedData,
+      });
     } catch (error: unknown) {
       if ((error as Error).name === "AbortError") {
         console.log("Ollama request aborted.");
@@ -370,103 +366,4 @@ const cleanUp = async () => {
 };
 // cleanUp()
 
-// export const generateAnswerForExistingChat = asyncHandler(
-//   async (req: Request, res: Response) => {
-//     const { chatId } = req.params;
-//     const { prompt } = req.body;
 
-//     if (!prompt) {
-//       res.status(400).json({ error: "Prompt is required" });
-//       return;
-//     }
-
-//     try {
-//       const scrapedData = await scrapeDocs(prompt);
-//       if (!scrapedData) {
-//         return res.status(400).json({ error: "No meaningful content found." });
-//       }
-
-//       const maxInputLength = 16000;
-
-//       const trimmedInput =
-//         scrapedData.length > maxInputLength
-//           ? scrapedData.slice(0, maxInputLength)
-//           : scrapedData;
-
-//       const stream = await googleAiClient.models.generateContentStream({
-//         model: "gemini-2.0-flash",
-//         contents: trimmedInput,
-//         config: {
-//           temperature: 0.2,
-//           systemInstruction: `You are a technical assistant specializing in simplifying technical documentation for beginners.
-
-// Your task:
-// - Carefully read and understand the scraped content provided.
-// - Summarize only the important and relevant parts in clear, beginner-friendly language.
-// - Use simple, real-world analogies where helpful.
-// - Provide simple code examples in relevant programming languages to illustrate concepts.
-// - Format your response using bullet points and code blocks when appropriate.
-// - Avoid technical jargon and overly complex explanations.
-// - If the scraped content does not contain enough information, answer based on your own knowledge, but state when you are doing so.
-// - Do not provide unrelated information or speculation.
-// - Keep the response concise and focused on teaching.
-
-// Respond clearly and helpfully.`,
-//         },
-//       });
-
-//       let string = "";
-
-//       res.setHeader("Content-Type", "text/plain");
-//       res.setHeader("Transfer-Encoding", "chunked");
-//       res.flushHeaders();
-
-//       for await (const chunk of stream) {
-//         if (chunk.text) {
-//           res.write(chunk.text);
-//           string += chunk.text;
-//         }
-//         if (res.flush) res.flush();
-//       }
-
-//       const textSplitter = new RecursiveCharacterTextSplitter({
-//         chunkSize: 500,
-//         chunkOverlap: 50,
-//       });
-//       const texts = await textSplitter.splitText(scrapedData);
-
-//       const chat = await Chat.findById(chatId);
-
-//       if (!chat) {
-//         return new CustomError("Chat not found!", 400);
-//       }
-
-//       const userMessage = new Message({
-//         role: "user",
-//         content: prompt,
-//       });
-
-//       const systemMessage = new Message({
-//         role: "assistant",
-//         content: string,
-//       });
-//       await userMessage.save();
-//       await systemMessage.save();
-
-//       chat.messages.push(...[userMessage._id, systemMessage._id]);
-
-//       await chat.save();
-//       userMessage.chatId = chat._id;
-//       systemMessage.chatId = chat._id;
-//       await Promise.all([userMessage.save(), systemMessage.save()]);
-//     } catch (error: unknown) {
-//       if ((error as Error).name === "AbortError") {
-//         console.log("Ollama request aborted.");
-//         res.end();
-//       } else {
-//         console.error("Error streaming response from Ollama:", error);
-//         res.status(500).json({ error: "Failed to generate response" });
-//       }
-//     }
-//   }
-// );

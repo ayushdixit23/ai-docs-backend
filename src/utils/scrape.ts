@@ -2,11 +2,7 @@ import axios from "axios";
 import * as cheerio from "cheerio";
 import { htmlToText } from "html-to-text";
 
-export async function scrapeDocs(url: string): Promise<string | null> {
-    if (!url || !/^https:\/\/.+/.test(url)) {
-        console.error("Invalid URL:", url);
-        return null;
-    }
+export async function scrapeDocs(url: string): Promise<string> {
     try {
         const { data } = await axios.get(url, {
             headers: {
@@ -29,8 +25,7 @@ export async function scrapeDocs(url: string): Promise<string | null> {
         }
 
         if (!content) {
-            console.warn("No meaningful content found.");
-            return null;
+            return "";
         }
 
         const cleanText = htmlToText(content, {
@@ -48,6 +43,6 @@ export async function scrapeDocs(url: string): Promise<string | null> {
         return cleanText.trim();
     } catch (error: any) {
         console.error("Error scraping document:", error.message);
-        return null;
+        return "";
     }
 }
