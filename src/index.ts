@@ -24,7 +24,7 @@ const allowedOrigins = [
   "http://192.168.1.3:3000",
   "http://192.168.1.4:3000",
   "http://192.168.1.5:3000",
-  "http://192.168.1.6:3000",
+  "http://192.168.1.10:3000",
 ];
 
 // Initialize Express app
@@ -94,14 +94,12 @@ const handleUserData = async (event: any) => {
 };
 
 const processWebhook = async (req: Request, res: Response): Promise<any> => {
-  console.log("✅ WebHook Triggered!");
 
   const svix_id = req.headers["svix-id"] as string;
   const svix_timestamp = req.headers["svix-timestamp"] as string;
   const svix_signature = req.headers["svix-signature"] as string;
 
   if (!svix_id || !svix_timestamp || !svix_signature) {
-    console.error("❌ Missing Svix Headers");
     return res
       .status(400)
       .json({ success: false, message: "Missing required headers" });
@@ -118,7 +116,6 @@ const processWebhook = async (req: Request, res: Response): Promise<any> => {
     });
 
     if (!evt) {
-      console.error("❌ Invalid event");
       return res
         .status(400)
         .json({ success: false, message: "Invalid event data" });
@@ -138,8 +135,6 @@ const processWebhook = async (req: Request, res: Response): Promise<any> => {
         break;
 
       default:
-        // @ts-ignore
-        console.warn(`⚠️ Unhandled event type: ${evt?.type}`);
         break;
     }
 
@@ -147,7 +142,6 @@ const processWebhook = async (req: Request, res: Response): Promise<any> => {
       .status(200)
       .json({ success: true, message: "Webhook processed" });
   } catch (err) {
-    console.error("❌ Webhook verification failed:", err);
     return res
       .status(500)
       .json({

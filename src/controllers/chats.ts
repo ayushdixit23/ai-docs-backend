@@ -7,8 +7,7 @@ import { CustomError } from "../middlewares/errors/CustomError.js";
 import mongoose from "mongoose";
 import { scrapeDocs } from "../utils/scrape.js";
 import googleAiClient from "../helpers/gemini.js";
-import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
-import { GoogleGenerativeAIEmbeddings } from "@langchain/google-genai";
+import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters"
 import qdrantClient from "../helpers/qdrantClient.js";
 import { QdrantVectorStore } from "@langchain/qdrant";
 import embeddings from "../helpers/embeddings.js";
@@ -263,16 +262,16 @@ export const generateAnswerForExistingChat = asyncHandler(
       if (!scrapedData) {
         return res.status(400).json({ error: "No meaningful content found." });
       }
-      const textSplitter = new RecursiveCharacterTextSplitter({
-        chunkSize: 500,
-        chunkOverlap: 50,
-      });
-      const texts = await textSplitter.splitText(scrapedData);
+      // const textSplitter = new RecursiveCharacterTextSplitter({
+      //   chunkSize: 500,
+      //   chunkOverlap: 50,
+      // });
+      // const texts = await textSplitter.splitText(scrapedData);
 
-      await QdrantVectorStore.fromTexts(texts, [], embeddings, {
-        client: qdrantClient,
-        collectionName: "chats_docs_chunks",
-      });
+      // await QdrantVectorStore.fromTexts(texts, [], embeddings, {
+      //   client: qdrantClient,
+      //   collectionName: "chats_docs_chunks",
+      // });
       res.status(200).json({
         success: true,
         message: "Scraped data processed successfully",
