@@ -58,11 +58,12 @@ jobs:
         export $(cat .env | grep -v ^# | xargs)
 
         echo "Stopping and removing old ai-docs-backend container if exists..."
-        sudo docker ps -q --filter "name=ai-docs-backend" | grep -q . && \
-         sudo docker stop ai-docs-backend && \
-         sudo docker rm -f ai-docs-backend && \
-         sudo docker images -q ayushdixit23/ai-docs-backend* | xargs sudo docker rmi -f && \
-         echo "Old ai-docs-backend container stopped and removed along with images."
+        sudo docker ps -aq --filter "name=ai-docs-backend" | grep -q . && \
+        (sudo docker stop ai-docs-backend || true) && \
+        sudo docker rm -f ai-docs-backend && \
+        sudo docker images -q ayushdixit23/ai-docs-backend* | xargs -r sudo docker rmi -f && \
+        echo "Old ai-docs-backend container stopped and removed along with images."
+
 
         # Run new ai-docs-backend container with env variables loaded from .env
         echo "Starting new ai-docs-backend container..."
