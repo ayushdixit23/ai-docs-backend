@@ -178,8 +178,8 @@ export const followUpOrStandAlone = asyncHandler(
         error: !prompt
           ? "Prompt is required"
           : !chatId
-          ? "Chat ID is required"
-          : "Invalid chat ID",
+            ? "Chat ID is required"
+            : "Invalid chat ID",
         success: false,
       });
     }
@@ -192,7 +192,13 @@ export const followUpOrStandAlone = asyncHandler(
           .json({ error: "Chat not found", success: false });
       }
 
-      const chatHistory = await Message.find({ chatId }).select("role content");
+      const orderedChatHistory = await Message.find({ chatId })
+        .sort({ createdAt: -1 })
+        .limit(15)
+        .select("role content")
+        .lean();
+
+      const chatHistory = orderedChatHistory.reverse();
 
       const contents = [
         ...chatHistory.map((msg) => ({
