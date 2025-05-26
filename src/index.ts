@@ -15,6 +15,8 @@ import { Webhook } from "svix";
 import User from "./models/user.js";
 import connectDb from "./helpers/connectDb.js";
 import chatRouter from "./routes/chats.js"
+import { rateLimit } from 'express-rate-limit'
+
 
 // Allowed origins for CORS
 const allowedOrigins = [
@@ -30,12 +32,21 @@ const allowedOrigins = [
 // Initialize Express app
 const app = express();
 
+const limiter = rateLimit({
+	windowMs: 15 * 60 * 1000,
+	limit: 500, 
+	standardHeaders: 'draft-8',
+	legacyHeaders: false, 
+})
+
 // Middlewares
 app.use(helmet()); // Security headers
 
 // Logging based on environment (development/production)
 const logFormat = NODE_ENV === "development" ? "dev" : "combined";
 app.use(morgan(logFormat));
+
+app.use(limiter)
 
 // Compression middleware
 app.use(compression());

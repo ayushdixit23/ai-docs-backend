@@ -26,8 +26,6 @@
   },
   "dependencies": {
     "@google/genai": "^1.0.1",
-    "@langchain/community": "^0.3.44",
-    "@langchain/core": "^0.3.57",
     "@langchain/google-genai": "^0.2.9",
     "@langchain/qdrant": "^0.1.2",
     "@langchain/textsplitters": "^0.1.0",
@@ -38,13 +36,13 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "express-rate-limit": "^7.5.0",
     "helmet": "^8.0.0",
     "html-to-text": "^9.0.5",
     "ioredis": "^5.4.2",
     "langchain": "^0.3.27",
     "mongoose": "^8.9.5",
     "morgan": "^1.10.0",
-    "qdrant-client": "^0.0.1",
     "svix": "^1.62.0",
     "uuid": "^11.1.0"
   }
