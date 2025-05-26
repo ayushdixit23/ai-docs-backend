@@ -14,39 +14,33 @@ import bodyParser from "body-parser";
 import { Webhook } from "svix";
 import User from "./models/user.js";
 import connectDb from "./helpers/connectDb.js";
-import chatRouter from "./routes/chats.js"
-import { rateLimit } from 'express-rate-limit'
-
+import chatRouter from "./routes/chats.js";
+import { rateLimit } from "express-rate-limit";
 
 // Allowed origins for CORS
 const allowedOrigins = [
   "http://localhost:3000",
   "http://localhost:3001",
-  "http://192.168.1.2:3000",
-  "http://192.168.1.3:3000",
-  "http://192.168.1.4:3000",
-  "http://192.168.1.5:3000",
-  "http://192.168.1.10:3000",
+  "https://docsimplify.ayushdixit.site",
 ];
 
 // Initialize Express app
 const app = express();
 
 const limiter = rateLimit({
-	windowMs: 15 * 60 * 1000,
-	limit: 500, 
-	standardHeaders: 'draft-8',
-	legacyHeaders: false, 
-})
+  windowMs: 15 * 60 * 1000,
+  limit: 500,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+});
 
 // Middlewares
-app.use(helmet()); // Security headers
+app.use(helmet());
 
-// Logging based on environment (development/production)
 const logFormat = NODE_ENV === "development" ? "dev" : "combined";
 app.use(morgan(logFormat));
 
-app.use(limiter)
+app.use(limiter);
 
 // Compression middleware
 app.use(compression());
@@ -77,7 +71,7 @@ app.get("/", (_, res) => {
   res.send("Server is running!");
 });
 
-app.use("/api", chatRouter)
+app.use("/api", chatRouter);
 
 const handleUserData = async (event: any) => {
   const { id, image_url, last_name, first_name, email_addresses } = event.data;
@@ -153,12 +147,10 @@ const processWebhook = async (req: Request, res: Response): Promise<any> => {
       .json({ success: true, message: "Webhook processed" });
   } catch (err) {
     console.log("Error processing webhook:", err);
-    return res
-      .status(500)
-      .json({
-        success: false,
-        message: "Server error during webhook processing",
-      });
+    return res.status(500).json({
+      success: false,
+      message: "Server error during webhook processing",
+    });
   }
 };
 
