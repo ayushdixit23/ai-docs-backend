@@ -94,7 +94,6 @@ const handleUserData = async (event: any) => {
 };
 
 const processWebhook = async (req: Request, res: Response): Promise<any> => {
-
   const svix_id = req.headers["svix-id"] as string;
   const svix_timestamp = req.headers["svix-timestamp"] as string;
   const svix_signature = req.headers["svix-signature"] as string;
@@ -142,6 +141,7 @@ const processWebhook = async (req: Request, res: Response): Promise<any> => {
       .status(200)
       .json({ success: true, message: "Webhook processed" });
   } catch (err) {
+    console.log("Error processing webhook:", err);
     return res
       .status(500)
       .json({

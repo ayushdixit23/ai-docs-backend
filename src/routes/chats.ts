@@ -1,9 +1,8 @@
 import express from "express"
-import { createChat, deleteChat, generateAnswerForExistingChat, getChats, getDocsSimplified, getMessages, updateChat } from "../controllers/chats.js"
+import { createChat, deleteChat, followUpOrStandAlone, getChats, getDocsSimplified, getMessages, updateChat } from "../controllers/chats.js"
 const router = express.Router()
 
-// router.post("/generate", generateAnswer)
-router.post("/generate/:chatId", generateAnswerForExistingChat)
+router.post("/followUpOrStandAlone/:chatId", followUpOrStandAlone)
 router.post("/getDocsScrapeData/:chatId", getDocsSimplified)
 router.post("/createChat/:clerkUserId", createChat)
 router.get("/getChats/:clerkUserId", getChats)
