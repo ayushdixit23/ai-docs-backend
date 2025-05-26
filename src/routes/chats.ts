@@ -9,8 +9,6 @@ router.get("/getChats/:clerkUserId", getChats)
 router.get("/getMessages/:chatId", getMessages)
 router.put("/updateChatTitle/:chatId/:clerkUserId", updateChat)
 router.delete("/deleteChat/:chatId/:clerkUserId", deleteChat)
-
-
 router.get("/getCheck", (_, res) => {
   res.status(200).json({ message: "Chat route is working!" })
 })

@@ -55,7 +55,6 @@ export const getDocsSimplified = asyncHandler(
     try {
       const scrapedData = await scrapeDocs(prompt);
 
-      console.log("Scraped Data:", scrapedData);
       const maxInputLength = 16000;
 
       const trimmedInput =
@@ -292,13 +291,6 @@ Output: "{\\"type\\": \\"follow-up\\", \\"question\\": \\"What was the last poin
           success: false,
         });
       }
-
-      console.log(
-        "Parsed Output:",
-        parsedOutput,
-        "Question:",
-        parsedOutput.question
-      );
 
       let stream;
       let string = "";
@@ -545,15 +537,3 @@ export const deleteChat = asyncHandler(async (req: Request, res: Response) => {
     .status(200)
     .json({ success: true, message: "Chat deleted successfully" });
 });
-
-const cleanUp = async () => {
-  console.log("Cleaning up...");
-  await Chat.deleteMany();
-  await Message.deleteMany();
-
-  await User.findOneAndUpdate({}, { chats: [] });
-
-  console.log("Cleanup complete.");
-};
-
-// cleanUp()
