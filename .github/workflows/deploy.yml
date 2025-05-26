@@ -64,6 +64,10 @@ jobs:
         sudo docker images -q ayushdixit23/ai-docs-backend* | xargs -r sudo docker rmi -f && \
         echo "Old ai-docs-backend container stopped and removed along with images."
 
+        # Ensure the Docker network exists
+        echo "Checking if Docker network 'ai_dock_network' exists..."
+        sudo docker network inspect ai_dock_network > /dev/null 2>&1 || \
+        sudo docker network create ai_dock_network
 
         # Run new ai-docs-backend container with env variables loaded from .env
         echo "Starting new ai-docs-backend container..."

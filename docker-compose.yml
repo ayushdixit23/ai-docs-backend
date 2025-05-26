@@ -29,4 +29,5 @@ volumes:
 
 networks:
   ai_dock_network:
+    name: ai_dock_network
     driver: bridge
