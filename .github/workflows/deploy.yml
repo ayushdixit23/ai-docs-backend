@@ -1,0 +1,85 @@
+name: Deploy to Google Cloud VM
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    # Checkout the code
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    # Log in to Docker Hub
+    - name: Log in to Docker Hub
+      run: |
+        echo "Logging into Docker Hub..."
+        echo "${{ secrets.DOCKERHUB_ACCESS_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+        echo "Docker login successful!"
+
+    # Build and push Docker image
+    - name: Build and push Docker image
+      run: |
+        echo "Building Docker image..."
+        docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/ai-docs-backend:${{ github.sha }} -t ${{ secrets.DOCKERHUB_USERNAME }}/ai-docs-backend:latest .
+        echo "Docker image built successfully. Pushing to Docker Hub..."
+        docker push ${{ secrets.DOCKERHUB_USERNAME }}/ai-docs-backend:${{ github.sha }}
+        docker push ${{ secrets.DOCKERHUB_USERNAME }}/ai-docs-backend:latest
+        echo "Docker image pushed successfully!"
+
+    # Set up SSH key
+    - name: Setup SSH key
+      run: |
+        echo "Setting up SSH key..."
+        mkdir -p ~/.ssh
+        echo "${{ secrets.GCP_SSH_PRIVATE_KEY }}" > ~/.ssh/gcp_ecdsa_key
+        chmod 600 ~/.ssh/gcp_ecdsa_key
+        ssh-keyscan ${{ secrets.GCP_VM_IP }} >> ~/.ssh/known_hosts
+        echo "SSH key setup complete!"
+
+
+    # Deploy on GCP VM
+    - name: Deploy on GCP VM
+      run: |
+        echo "Deploying to GCP VM..."
+        ssh -i ~/.ssh/gcp_ecdsa_key ${{ secrets.GCP_VM_USERNAME }}@${{ secrets.GCP_VM_IP }} << 'EOF'
+        set -e  # Exit on error
+
+        # Navigate to the ai-docs folder and load the .env file
+        echo "Navigating to ai-docs directory..."
+        cd ai-docs/
+
+        # Load environment variables from the .env file
+        echo "Loading environment variables from .env file..."
+        export $(cat .env | grep -v ^# | xargs)
+
+        echo "Stopping and removing old ai-docs-backend container if exists..."
+        sudo docker ps -q --filter "name=ai-docs-backend" | grep -q . && \
+         sudo docker stop ai-docs-backend && \
+         sudo docker rm -f ai-docs-backend && \
+         sudo docker images -q ayushdixit23/ai-docs-backend* | xargs sudo docker rmi -f && \
+         echo "Old ai-docs-backend container stopped and removed along with images."
+
+        # Run new ai-docs-backend container with env variables loaded from .env
+        echo "Starting new ai-docs-backend container..."
+        sudo docker run -d \
+          --name ai-docs-backend \
+          --restart always \
+          --network ai_dock_network \
+          -p $PORT:$PORT \
+          -e PORT=$PORT \
+          -e MONGO_URI=$MONGO_URI \
+          -e NODE_ENV=$NODE_ENV \
+          -e QDRANT_HOST=$QDRANT_HOST \
+          -e GEMINI_API_KEY=$GEMINI_API_KEY \
+          -e CLERK_WEBHOOK_SECRET_KEY=$CLERK_WEBHOOK_SECRET_KEY \
+          -e MONGO_INITDB_ROOT_USERNAME=$MONGO_INITDB_ROOT_USERNAME \
+          -e MONGO_INITDB_ROOT_PASSWORD=$MONGO_INITDB_ROOT_PASSWORD \
+          ${{ secrets.DOCKERHUB_USERNAME }}/ai-docs-backend:latest
+        echo "New ai-docs-backend container started successfully!"
+        EOF
+        echo "Deployment to GCP VM completed!"
