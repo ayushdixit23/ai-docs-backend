@@ -154,11 +154,6 @@ Respond clearly and helpfully.`,
           },
         ],
       });
-
-      return res.status(200).json({
-        success: true,
-        message: "Response generated successfully",
-      });
     } catch (error: unknown) {
       res
         .status(500)
