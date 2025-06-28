@@ -10,7 +10,8 @@ services:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
     volumes:
-      - /home/fsayush100/ai_docs_mongo_data:/data/db
+      - ai_docs_mongo_data:/data/db
+
     networks:
       - ai_dock_network
 
