@@ -11,7 +11,6 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
     volumes:
       - ai_docs_mongo_data:/data/db
-
     networks:
       - ai_dock_network
 
@@ -26,6 +25,7 @@ services:
       - ai_dock_network
 
 volumes:
+  ai_docs_mongo_data:
   qdrant_data:
 
 networks:
