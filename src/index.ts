@@ -16,6 +16,7 @@ import User from "./models/user.js";
 import connectDb from "./helpers/connectDb.js";
 import chatRouter from "./routes/chats.js";
 import { rateLimit } from "express-rate-limit";
+import { ensureChatsDocsChunksCollection } from "./helpers/qdrantClient.js"
 
 // Allowed origins for CORS
 const allowedOrigins = [
@@ -165,6 +166,7 @@ app.use((_, res) => {
 app.use(errorMiddleware);
 
 connectDb(MONGO_URI);
+ensureChatsDocsChunksCollection();
 
 // Start server
 app.listen(PORT, () => {
